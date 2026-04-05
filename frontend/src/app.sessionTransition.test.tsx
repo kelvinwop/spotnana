@@ -634,5 +634,125 @@ describe("App logout transition boundary", () => {
       }
     })
   );
+});
 
+describe("AI settings session ownership boundary", () => {
+  test(
+    "late account AI settings save after logout does not restore account state into guest mode",
+    withIsolatedBrowserStorage(async () => {
+      const originalFetch = globalThis.fetch;
+      const originalToast = window.toast;
+      const rootElement = document.createElement("div");
+      document.body.appendChild(rootElement);
+      const root = ReactDOM.createRoot(rootElement);
+      const store = createStore();
+      const saveSettingsRequest = createDeferred<Response>();
+      const logoutRequest = createDeferred<Response>();
+      const toastMessages: Array<{ title: string; description?: string }> = [];
+
+      store.set(tokenAtom, "persisted-token");
+      store.set(userAtom, authenticatedUser);
+      store.set(authStatusAtom, "ready");
+
+      window.toast = (message: { title?: string; description?: string }) => {
+        toastMessages.push({
+          title: message.title ?? "",
+          description: message.description,
+        });
+      };
+
+      globalThis.fetch = async (input) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+
+        if (url.endsWith("/api/v1/chat/conversations")) {
+          return new Response(JSON.stringify({ mode: "account", conversations: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        if (url.endsWith("/api/v1/auth/settings/ai")) {
+          return saveSettingsRequest.promise;
+        }
+
+        if (url.endsWith("/api/v1/auth/logout")) {
+          return logoutRequest.promise;
+        }
+
+        throw new Error(`Unexpected fetch: ${url}`);
+      };
+
+      try {
+        await act(async () => {
+          root.render(
+            <Provider store={store}>
+              <App />
+            </Provider>
+          );
+          await flushEffects();
+        });
+
+        await clickButton(queryButtonByText(rootElement, "Open AI settings"));
+        await clickButton(queryButtonByExactText(rootElement, "Save AI settings"));
+
+        assert.equal(store.get(authSessionAtom).kind, "account");
+
+        await clickButton(queryButtonByText(rootElement, "Sign out"));
+        logoutRequest.resolve(
+          new Response(JSON.stringify({ message: "Signed out" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+
+        await settlePromiseWithoutFlushingEffects(logoutRequest.promise);
+
+        assert.equal(store.get(authSessionAtom).kind, "guest");
+        assert.equal(store.get(userAtom), null);
+
+        saveSettingsRequest.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                ...authenticatedUser,
+                aiSettings: {
+                  hasApiKey: false,
+                  providerPreference: "openrouter",
+                  model: "openrouter/auto",
+                },
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        );
+
+        await settlePromiseWithoutFlushingEffects(saveSettingsRequest.promise);
+
+        assert.equal(store.get(authSessionAtom).kind, "guest");
+        assert.equal(store.get(userAtom), null);
+        assert.deepEqual(toastMessages.at(-1), {
+          title: "Session changed",
+          description:
+            "Account settings finished saving after your session changed, so the result was ignored.",
+        });
+        assert.doesNotMatch(rootElement.textContent ?? "", /spotnana-user/);
+      } finally {
+        await act(async () => {
+          root.unmount();
+          await flushEffects();
+        });
+        rootElement.remove();
+        globalThis.fetch = originalFetch;
+        window.toast = originalToast;
+      }
+    })
+  );
 });

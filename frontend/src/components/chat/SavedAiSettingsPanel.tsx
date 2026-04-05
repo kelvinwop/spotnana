@@ -129,13 +129,21 @@ export function SavedAiSettingsPanel({ onSaveSuccess }: { onSaveSuccess?: () => 
         return;
       }
 
-      await updateAccountSettings({
+      const didApplyAccountUpdate = await updateAccountSettings({
         providerPreference: draftSelection.providerPreference,
         selectedModelPreset: draftSelection.selectedModelPreset,
         customModel: draftSelection.customModel,
         apiKeyInput: draftSelection.apiKey,
         apiKeyIntent,
       });
+      if (!didApplyAccountUpdate) {
+        window.toast({
+          title: "Session changed",
+          description: "Account settings finished saving after your session changed, so the result was ignored.",
+          variant: "destructive",
+        });
+        return;
+      }
       window.toast({
         title: "Settings saved",
         description: "Account AI settings were updated.",

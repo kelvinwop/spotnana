@@ -3,6 +3,7 @@ import { describe, test } from "bun:test";
 import { createStore } from "jotai";
 import {
   applyAuthStateAtom,
+  applyOwnedAccountUserAtom,
   authRestoreFailureAtom,
   authSessionAtom,
   authSessionBoundaryVersionAtom,
@@ -11,6 +12,7 @@ import {
   isAuthBootstrapPendingAtom,
   isAuthRestoreFailedAtom,
   isAuthenticatedAtom,
+  ownedAccountSessionAtom,
   tokenAtom,
   userAtom,
 } from "@/atoms/authAtoms";
@@ -140,60 +142,106 @@ describe("authAtoms session state", () => {
     );
   });
 
-describe("auth session boundary version", () => {
-  test("increments only when the authoritative session partition changes", () => {
-    const store = createStore();
+  describe("auth session boundary version", () => {
+    test("increments only when the authoritative session partition changes", () => {
+      const store = createStore();
 
-    assert.equal(store.get(authSessionBoundaryVersionAtom), 0);
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 0);
 
-    store.set(applyAuthStateAtom, {
-      token: "persisted-token",
-      user: null,
-      restoreFailure: null,
-      authStatus: "checking",
-    });
-    assert.equal(store.get(authSessionBoundaryVersionAtom), 1);
-    assert.deepEqual(store.get(authSessionAtom), {
-      kind: "bootstrap",
-      token: "persisted-token",
-      phase: "pending",
-      failure: null,
+      store.set(applyAuthStateAtom, {
+        token: "persisted-token",
+        user: null,
+        restoreFailure: null,
+        authStatus: "checking",
+      });
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 1);
+      assert.deepEqual(store.get(authSessionAtom), {
+        kind: "bootstrap",
+        token: "persisted-token",
+        phase: "pending",
+        failure: null,
+      });
+
+      store.set(applyAuthStateAtom, {
+        token: "persisted-token",
+        user: null,
+        restoreFailure: {
+          kind: "network_error",
+          message: "Network request failed.",
+        },
+        authStatus: "restore_failed",
+      });
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 1);
+
+      store.set(applyAuthStateAtom, {
+        token: "persisted-token",
+        user: authenticatedUser,
+        restoreFailure: null,
+        authStatus: "ready",
+      });
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 2);
+      assert.deepEqual(store.get(authSessionAtom), {
+        kind: "account",
+        user: authenticatedUser,
+      });
+
+      store.set(applyAuthStateAtom, {
+        token: null,
+        user: null,
+        restoreFailure: null,
+        authStatus: "ready",
+      });
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 3);
+      assert.deepEqual(store.get(authSessionAtom), {
+        kind: "guest",
+      });
     });
 
-    store.set(applyAuthStateAtom, {
-      token: "persisted-token",
-      user: null,
-      restoreFailure: {
-        kind: "network_error",
-        message: "Network request failed.",
-      },
-      authStatus: "restore_failed",
-    });
-    assert.equal(store.get(authSessionBoundaryVersionAtom), 1);
+    test("applyOwnedAccountUserAtom ignores async account updates after the auth session boundary changes", () => {
+      const store = createStore();
 
-    store.set(applyAuthStateAtom, {
-      token: "persisted-token",
-      user: authenticatedUser,
-      restoreFailure: null,
-      authStatus: "ready",
-    });
-    assert.equal(store.get(authSessionBoundaryVersionAtom), 2);
-    assert.deepEqual(store.get(authSessionAtom), {
-      kind: "account",
-      user: authenticatedUser,
-    });
+      store.set(applyAuthStateAtom, {
+        token: "persisted-token",
+        user: authenticatedUser,
+        restoreFailure: null,
+        authStatus: "ready",
+      });
 
-    store.set(applyAuthStateAtom, {
-      token: null,
-      user: null,
-      restoreFailure: null,
-      authStatus: "ready",
-    });
-    assert.equal(store.get(authSessionBoundaryVersionAtom), 3);
-    assert.deepEqual(store.get(authSessionAtom), {
-      kind: "guest",
+      const ownedSession = store.get(ownedAccountSessionAtom);
+      assert.deepEqual(ownedSession, {
+        userId: authenticatedUser.id,
+        boundaryVersion: 1,
+      });
+
+      if (ownedSession === null) {
+        throw new Error("Owned account session should exist for authenticated state.");
+      }
+
+      store.set(applyAuthStateAtom, {
+        token: null,
+        user: null,
+        restoreFailure: null,
+        authStatus: "ready",
+      });
+
+      const applied = store.set(applyOwnedAccountUserAtom, {
+        ownedSession,
+        user: {
+          ...authenticatedUser,
+          aiSettings: {
+            hasApiKey: false,
+            providerPreference: "openrouter",
+            model: "openrouter/auto",
+          },
+        },
+      });
+
+      assert.equal(applied, false);
+      assert.deepEqual(store.get(authSessionAtom), {
+        kind: "guest",
+      });
+      assert.equal(store.get(userAtom), null);
+      assert.equal(store.get(authSessionBoundaryVersionAtom), 2);
     });
   });
-});
-
 });

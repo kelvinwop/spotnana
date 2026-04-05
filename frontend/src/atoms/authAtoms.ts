@@ -21,6 +21,10 @@ export type AuthSessionState =
   | { readonly kind: "guest" }
   | { readonly kind: "account"; readonly user: AuthUser };
 export type AuthSessionMode = AuthSessionState["kind"];
+export interface OwnedAccountSession {
+  readonly userId: string;
+  readonly boundaryVersion: number;
+}
 
 interface AuthStateInput {
   readonly authStatus: AuthStatus;
@@ -114,6 +118,44 @@ export const applyAuthStateAtom = atom(null, (get, set, nextState: ApplyAuthStat
   set(authRestoreFailureAtom, nextState.restoreFailure);
   set(authStatusAtom, nextState.authStatus);
 });
+
+export const ownedAccountSessionAtom = atom<OwnedAccountSession | null>((get) => {
+  const authSession = get(authSessionAtom);
+  if (authSession.kind !== "account") {
+    return null;
+  }
+
+  return {
+    userId: authSession.user.id,
+    boundaryVersion: get(authSessionBoundaryVersionAtom),
+  };
+});
+
+export const applyOwnedAccountUserAtom = atom(
+  null,
+  (get, set, nextState: { ownedSession: OwnedAccountSession; user: AuthUser }) => {
+    const currentOwnedSession = get(ownedAccountSessionAtom);
+    if (
+      currentOwnedSession === null ||
+      currentOwnedSession.userId !== nextState.ownedSession.userId ||
+      currentOwnedSession.boundaryVersion !== nextState.ownedSession.boundaryVersion
+    ) {
+      return false;
+    }
+
+    set(
+      applyAuthStateAtom,
+      {
+        token: get(tokenAtom),
+        user: nextState.user,
+        restoreFailure: get(authRestoreFailureAtom),
+        authStatus: get(authStatusAtom),
+      }
+    );
+    return true;
+  }
+);
+
 export const authBootstrapPhaseAtom = atom<"pending" | "restore_failed" | null>((get) => {
   const authSession = get(authSessionAtom);
   return authSession.kind === "bootstrap" ? authSession.phase : null;

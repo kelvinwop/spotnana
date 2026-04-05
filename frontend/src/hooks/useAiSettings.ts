@@ -1,7 +1,12 @@
 import { useCallback, useMemo } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { authApi } from "@/api/auth";
-import { authSessionAtom, userAtom } from "@/atoms/authAtoms";
+import {
+  applyOwnedAccountUserAtom,
+  authSessionAtom,
+  ownedAccountSessionAtom,
+  userAtom,
+} from "@/atoms/authAtoms";
 import { guestAiSettingsAtom } from "@/atoms/chatAtoms";
 import {
   CUSTOM_MODEL_OPTION_ID,
@@ -19,8 +24,10 @@ interface AccountSettingsFormState extends PersistedAiSettings {
 
 export function useAiSettings() {
   const authSession = useAtomValue(authSessionAtom);
-  const [user, setUser] = useAtom(userAtom);
+  const ownedAccountSession = useAtomValue(ownedAccountSessionAtom);
+  const [user] = useAtom(userAtom);
   const [guestSettings, setGuestSettings] = useAtom(guestAiSettingsAtom);
+  const applyOwnedAccountUser = useSetAtom(applyOwnedAccountUserAtom);
   const isAuthenticated = authSession.kind === "account";
   const isAuthSessionResolved = authSession.kind === "guest" || authSession.kind === "account";
   const canEditGuestSettings = authSession.kind === "guest";
@@ -67,8 +74,8 @@ export function useAiSettings() {
       apiKeyInput: string;
       apiKeyIntent: AccountApiKeyIntent;
     }) => {
-      if (!user) {
-        return;
+      if (!user || ownedAccountSession === null) {
+        return false;
       }
 
       const payload = buildAccountAiSettingsRequest({
@@ -80,9 +87,12 @@ export function useAiSettings() {
       });
 
       const response = await authApi.updateAiSettings(payload);
-      setUser(response.user);
+      return applyOwnedAccountUser({
+        ownedSession: ownedAccountSession,
+        user: response.user,
+      });
     },
-    [setUser, user]
+    [applyOwnedAccountUser, ownedAccountSession, user]
   );
 
   return {
