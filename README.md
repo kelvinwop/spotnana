@@ -1,8 +1,8 @@
 # Spotnana AI Chat Assessment App
 
 A purpose-built AI chat application for the Spotnana frontend engineer assessment.
-This repository stays focused on the flows an assessor will actually review: BYOK prompt submission,
-guest/account persistence, model selection, loading and error states, and duplicate-request defense.
+This repository focuses on BYOK prompt submission, guest/account persistence, model selection,
+loading and error states, and duplicate-request defense.
 
 ## What ships in this repo
 
@@ -74,7 +74,13 @@ cd frontend
 bun install
 ```
 
-Create a frontend env file:
+A frontend `.env` file is optional for local development. If it is omitted, the frontend defaults to:
+
+```env
+VITE_API_URL=http://localhost:5000
+```
+
+If you want to override that default, create a frontend env file:
 
 - Unix/macOS:
   ```bash
@@ -85,12 +91,6 @@ Create a frontend env file:
   Copy-Item env.example .env
   ```
 
-Default frontend env:
-
-```env
-VITE_API_URL=http://localhost:5000
-```
-
 Start the frontend:
 
 ```bash
@@ -99,14 +99,19 @@ bun run dev
 
 Frontend URL: `http://localhost:5173`
 
+### Local routes
+
+- `/` → chat workspace
+- `/chat` → chat workspace
+- `/home` → landing page
+
 ## Guest mode vs account mode
 
 ### Guest mode
 
-- Works immediately after backend is configured and the user adds their own API key in settings
+- Works after the backend is running and the user adds their own API key in settings
 - Does **not** require MongoDB to be reachable for the UI to load
 - Persists chat history in the frontend persistence boundary
-- Supports the “start chatting instantly” assessment requirement
 
 ### Account mode
 
@@ -116,7 +121,9 @@ Frontend URL: `http://localhost:5173`
 - Keeps saved AI settings on the account model for signed-in use
 
 If MongoDB is unavailable, the backend still starts and `/health` reports the DB as unavailable.
-Guest mode remains usable, while account-specific routes return an availability error until MongoDB connects.
+Guest mode remains usable. Account-backed auth, settings, and conversation routes depend on MongoDB,
+and the current code does not present one identical error shape across every public and authenticated route
+while the database is unavailable.
 
 ## Environment model
 
@@ -163,7 +170,7 @@ The backend keeps a strict typed env boundary so runtime mode and database inten
 - `PUT /api/v1/chat/conversations/:id/title`
 - `DELETE /api/v1/chat/conversations/:id`
 
-## Project structure
+## Abridged project structure
 
 ```text
 .
@@ -199,6 +206,7 @@ The backend keeps a strict typed env boundary so runtime mode and database inten
 - `bun run lint`
 - `bun run typecheck`
 - `bun run build` *(workspace QC invokes the declared baseline build flow)*
+- `bun run test`
 
 ### Frontend
 
@@ -206,16 +214,15 @@ The backend keeps a strict typed env boundary so runtime mode and database inten
 - `bun run lint`
 - `bun run typecheck`
 - `bun run build`
+- `bun run test`
 
-## Assessment notes
+## Scope notes
 
-This repository intentionally omits unrelated product surfaces so review stays focused:
+This repository intentionally omits unrelated product surfaces so the implementation stays focused on the core chat, auth, persistence, and BYOK settings flows:
 
 - no Stripe flows
 - no Discord OAuth
 - no admin dashboard
 - no settings pages outside the chat workspace
-- no extra branding residue in the main UI copy
 
-What remains is the minimal product surface needed for the Spotnana assessment, with enough code structure to be readable during review.
-
+For more implementation detail, see the workspace-specific READMEs in `backend/` and `frontend/`.
