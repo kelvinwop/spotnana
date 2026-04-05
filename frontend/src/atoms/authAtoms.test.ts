@@ -18,7 +18,7 @@ import { type AuthUser } from "@/types/chat";
 
 const authenticatedUser: AuthUser = {
   id: "user-1",
-  username: "spotnana-kelvin",
+  username: "spotnana-user",
   email: "spotnana@example.com",
   role: "user",
   aiSettings: {

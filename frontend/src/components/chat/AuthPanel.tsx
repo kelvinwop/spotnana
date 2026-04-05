@@ -52,7 +52,7 @@ export function AuthPanel({ mode, status, onLogin, onRegister, onSwitchMode }: A
             autoComplete={mode === "login" ? "username" : "new-username"}
             disabled={isSubmitting}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="spotnana-kelvin"
+            placeholder="spotnana-user"
             required
             value={username}
           />

@@ -1,5 +1,7 @@
 # Spotnana AI Chat Assessment App
 
+## Hosted version [here](https://spotnana.soleye.com/)
+
 A purpose-built AI chat application for the Spotnana frontend engineer assessment.
 This repository focuses on BYOK prompt submission, guest/account persistence, model selection,
 loading and error states, and duplicate-request defense.

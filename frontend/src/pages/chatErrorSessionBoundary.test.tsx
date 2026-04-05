@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const authenticatedUser: AuthUser = {
   id: "user-1",
-  username: "spotnana-kelvin",
+  username: "spotnana-user",
   email: "spotnana@example.com",
   role: "user",
   aiSettings: {

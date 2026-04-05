@@ -20,7 +20,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const authenticatedUser: AuthUser = {
   id: "user-1",
-  username: "spotnana-kelvin",
+  username: "spotnana-user",
   email: "spotnana@example.com",
   role: "user",
   aiSettings: {
